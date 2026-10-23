@@ -1,0 +1,24 @@
+# Reverse proxy and TLS (10-DEPLOYMENT section 4.2). Certificates are obtained and renewed automatically; plain HTTP is
+# redirected to HTTPS.
+{$APP_DOMAIN} {
+    encode zstd gzip
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        -Server
+    }
+    request_body {
+        max_size 12MB            # 10 MiB documents + headroom; the app enforces 1 MiB for JSON (09-SECURITY section 5)
+    }
+    reverse_proxy app:8080 {
+        health_uri      /actuator/health/readiness
+        health_interval 10s
+        # Caddy adds X-Forwarded-For/Proto/Host; the app trusts them only because it is reachable solely from this network
+    }
+    log {
+        output file /data/access.log {
+            roll_size 10MB
+            roll_keep 5
+        }
+        format json              # Authorization, Cookie and Set-Cookie headers are redacted by Caddy by default
+    }
+}

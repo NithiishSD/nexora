@@ -1,0 +1,35 @@
+spring:
+  config:
+    # Load this file only when the production profile is active.
+    activate:
+      on-profile: prod
+  lifecycle:
+    # finish requests in flight on SIGTERM before stopping (compose stop_grace_period is 40 s)
+    timeout-per-shutdown-phase: 30s
+  datasource:
+    # Production must provide the database URL; there is intentionally no default.
+    url: ${DB_URL}
+    # Missing credentials should fail startup instead of using development values.
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  flyway:
+    # Migrations run as the schema owner (nexora_owner); the application connects as nexora_app, which cannot change
+    # the schema or rewrite ledger rows (NFR-SEC-08, 10-DEPLOYMENT section 4.3). No defaults: missing values stop startup.
+    url: ${FLYWAY_URL:${DB_URL}}
+    user: ${FLYWAY_USER}
+    password: ${FLYWAY_PASSWORD}
+
+server:
+  shutdown: graceful
+  # the client address comes from Caddy's X-Forwarded-For (the app is reachable only through Caddy)
+  forward-headers-strategy: framework
+
+logging:
+  structured:
+    format:
+      # NFR-OBS-01, ADR-022: one JSON object per log line (Elastic Common Schema), MDC and key-value pairs as fields.
+      console: ecs
+  level:
+    # Normal operational logging for production.
+    root: INFO
+    com.nexora: INFO

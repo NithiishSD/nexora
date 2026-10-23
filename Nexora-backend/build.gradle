@@ -1,0 +1,146 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '4.1.1'
+	id 'io.spring.dependency-management' version '1.1.7'
+	id 'jacoco'
+	id 'org.owasp.dependencycheck' version '13.0.0'
+}
+
+group = 'com.nexora'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+// A stable jar name for the Docker image, and the build version at /actuator/info (the desktop client checks it).
+springBoot {
+	buildInfo()
+}
+
+tasks.named('bootJar') {
+	archiveFileName = 'app.jar'
+}
+
+// Security patches over the Spring Boot 4.1.1 BOM (the dependency audit found High/Critical CVEs in the BOM versions;
+// each override is the first fixed patch release of the same line). Remove an override once a Boot release ships it.
+ext['tomcat.version'] = '11.0.25'          // CVE-2026-65182, CVE-2026-65905, CVE-2026-68525 (critical) in 11.0.24
+ext['jackson-bom.version'] = '3.1.7'       // CVE-2026-68497, -89407, -89425, -91776, -91777 (high) in 3.1.5
+ext['jackson-2-bom.version'] = '2.21.7'    // the same Jackson CVEs in 2.21.5 (Jackson 2 still arrives via springdoc)
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-flyway'
+	implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.flywaydb:flyway-database-postgresql'
+	// Prometheus format for /actuator/prometheus (NFR-OBS-04, ADR-022); version from the Spring Boot BOM
+	implementation 'io.micrometer:micrometer-registry-prometheus'
+	// springdoc 3.x is the line built for Spring Boot 4 (2.x targets Boot 3).
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
+	runtimeOnly 'org.postgresql:postgresql'
+	testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-flyway-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+	testImplementation 'org.testcontainers:testcontainers-postgresql'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+jacoco {
+	toolVersion = '0.8.15'
+}
+
+tasks.named('test') {
+	// Performance tests (5-year reference data, latency budgets) take minutes: excluded from the normal build and run
+	// alone with ./gradlew test -Pperformance at the M7 gate and before a release (08-TESTING section 12)
+	useJUnitPlatform {
+		if (project.hasProperty('performance')) {
+			includeTags 'performance'
+		} else {
+			excludeTags 'performance'
+		}
+	}
+	finalizedBy 'jacocoTestReport'
+	// the frozen API contract is a test input: editing it reruns the tests (OpenApiExportTest compares it)
+	inputs.files('openapi.json').withPropertyName('apiContract')
+	// files outside this project that tests read: a change to any of them reruns the tests
+	inputs.files('../README.md', '../deploy/scripts/reconciliation.sql', '../deploy/postgres/10-roles.sh',
+			'../deploy/.env.prod.example').withPropertyName('outsideFiles')
+	inputs.dir('../nexora-desktop/src/test/kotlin').withPropertyName('desktopTests')
+	// ./gradlew test --tests OpenApiExportTest -PupdateOpenapi: rewrite openapi.json after an intended API change
+	if (project.hasProperty('updateOpenapi')) {
+		systemProperty 'nexora.openapi.update', 'true'
+	}
+	// ./gradlew test -PrandomOrder: classes and methods in random order, to prove tests do not depend on each other (NFR-TEST-09)
+	if (project.hasProperty('randomOrder')) {
+		systemProperty 'junit.jupiter.testclass.order.default', 'org.junit.jupiter.api.ClassOrderer$Random'
+		systemProperty 'junit.jupiter.testmethod.order.default', 'org.junit.jupiter.api.MethodOrderer$Random'
+	}
+}
+
+// The coverage gate measures business logic only: application services and domain classes (NFR-TEST-02, ADR-029).
+// Controllers, DTOs and configuration are exercised by the API tests but are not part of the ratio.
+def businessClasses = files(sourceSets.main.output.classesDirs).asFileTree.matching {
+	include 'com/nexora/*/application/**'
+	include 'com/nexora/*/domain/**'
+}
+
+tasks.named('jacocoTestReport') {
+	dependsOn 'test'
+	reports {
+		xml.required = true
+		html.required = true
+	}
+}
+
+tasks.named('jacocoTestCoverageVerification') {
+	dependsOn 'test'
+	classDirectories.setFrom(businessClasses)
+	violationRules {
+		rule {
+			limit {
+				counter = 'LINE'
+				value = 'COVEREDRATIO'
+				minimum = 0.80
+			}
+		}
+	}
+}
+
+// ./gradlew dependencyCheckAnalyze: fails on any High or Critical vulnerability (CVSS >= 7, NFR-SEC-07). Test-only
+// dependencies are not shipped and are skipped (the plugin's default). NVD_API_KEY makes the NVD download fast; without
+// it the download still works, slowly. OSS Index needs its own account, so NVD is the single source.
+dependencyCheck {
+	failBuildOnCVSS = 7.0f
+	formats = ['HTML', 'JSON']
+	suppressionFile = 'config/dependency-check-suppressions.xml'
+	nvd {
+		// only when set: an empty key is refused by NVD, while no key at all is allowed (just rate-limited)
+		def key = System.getenv('NVD_API_KEY')
+		if (key != null && !key.trim().isEmpty()) {
+			apiKey = key.trim()
+		}
+	}
+	analyzers {
+		ossIndex {
+			enabled = false
+		}
+	}
+}
+
+tasks.named('check') {
+	dependsOn 'jacocoTestCoverageVerification'
+}

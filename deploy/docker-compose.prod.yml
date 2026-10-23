@@ -1,0 +1,69 @@
+# Production stack (10-DEPLOYMENT section 4): the application, PostgreSQL on a private network, and Caddy in front with
+# automatic HTTPS. Run from the repository root:
+#   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod up -d
+name: nexora
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: postgres                    # admin account, used only to initialise and to maintain
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      OWNER_DB_PASSWORD: ${OWNER_DB_PASSWORD}    # read by deploy/postgres/10-roles.sh
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/10-roles.sh:/docker-entrypoint-initdb.d/10-roles.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [backend]                          # no ports published: only reachable by the app
+    mem_limit: 1g
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "5" } }
+
+  app:
+    image: ${IMAGE_REPO}:${IMAGE_TAG}            # e.g. ghcr.io/<owner>/nexora-backend:<git sha>
+    restart: unless-stopped
+    env_file: .env.prod
+    depends_on:
+      postgres: { condition: service_healthy }
+    read_only: true                              # container filesystem is immutable...
+    tmpfs: [/tmp]
+    volumes:
+      - documents_data:/var/lib/nexora/documents # ...except the uploaded documents (backed up with the database)
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 768m
+    stop_grace_period: 40s
+    networks: [backend, edge]                    # no host port: only Caddy reaches 8080; metrics port 8081 stays inside
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "5" } }
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      app: { condition: service_healthy }
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data                         # certificates: must persist or Let's Encrypt limits are hit
+      - caddy_config:/config
+    networks: [edge]
+    mem_limit: 128m
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "5" } }
+
+networks:
+  backend: { internal: true }                    # no outbound internet for the database traffic
+  edge: {}
+
+volumes:
+  postgres_data:
+  documents_data:
+  caddy_data:
+  caddy_config:

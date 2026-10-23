@@ -1,0 +1,49 @@
+name: smartsilk-local
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: smartsilk-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nexora_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: smartsilk_local_password
+    ports:
+      - "127.0.0.1:5431:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d nexora_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    image: eclipse-temurin:21-jre
+    container_name: smartsilk-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    working_dir: /app
+    volumes:
+      - ./app.jar:/app/app.jar:ro
+      - ./data/documents:/app/data/documents
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/nexora_db
+      DB_USERNAME: postgres
+      DB_PASSWORD: smartsilk_local_password
+      SERVER_PORT: 8080
+      MANAGEMENT_PORT: 8081
+      JWT_SECRET: smartsilk-local-secure-token-signing-key-32-bytes-long!
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 7d
+      RATE_LIMIT_ENABLED: "true"
+      DOCUMENTS_DIR: /app/data/documents
+      SPRING_PROFILES_ACTIVE: prod
+      BOOTSTRAP_OWNER_USERNAME: ""
+      BOOTSTRAP_OWNER_PASSWORD: ""
+    ports:
+      - "127.0.0.1:8080:8080"
+    command: ["java", "-jar", "/app/app.jar"]

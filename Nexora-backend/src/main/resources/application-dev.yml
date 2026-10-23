@@ -1,0 +1,35 @@
+spring:
+  config:
+    # Load this file only when the dev profile is explicitly active.
+    activate:
+      on-profile: dev
+
+logging:
+  level:
+    # Give application code detailed logs while developing locally.
+    com.nexora: DEBUG
+    # Keep Spring MVC logs at a normal informational level.
+    org.springframework.web: INFO
+
+springdoc:
+  # Dev only: serves /v3/api-docs (JSON) and /swagger-ui.html (interactive page).
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+management:
+  endpoint:
+    health:
+      # Useful for local diagnosis; avoid exposing details in production.
+      show-details: always
+
+nexora:
+  security:
+    # DEV ONLY: a fixed key so the app starts on a developer machine without setting JWT_SECRET.
+    # It is public (it is in the repository), so it must never be used anywhere else.
+    jwt-secret: ${JWT_SECRET:dev-only-secret-change-me-at-least-32-bytes-long}
+  bootstrap:
+    # DEV ONLY: a local owner account so a fresh dev database can be used at once.
+    owner-username: ${BOOTSTRAP_OWNER_USERNAME:owner}
+    owner-password: ${BOOTSTRAP_OWNER_PASSWORD:DevOwner#2026pass}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Dependency-check suppressions (09-SECURITY section 12). Only a false positive or a vulnerability proven not to
+  affect this application may be suppressed. Every entry needs:
+    - <notes> with the reason and who checked it,
+    - an until="YYYY-MM-DDZ" attribute at most 90 days ahead: after that date the finding fails the build again.
+  Example:
+  <suppress until="2026-12-31Z">
+    <notes>CVE-XXXX-YYYY affects the X feature, which this application does not use (checked 2026-10-09).</notes>
+    <packageUrl regex="true">^pkg:maven/org\.example/example@.*$</packageUrl>
+    <cve>CVE-XXXX-YYYY</cve>
+  </suppress>
+-->
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+</suppressions>

@@ -1,0 +1,27 @@
+# Deploy one image tag to the server (10-DEPLOYMENT section 6.2). Started by hand; waits for the owner's approval
+# (GitHub Environment "production" with required reviewers); never two at once.
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy (git sha or release tag)"
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency: production-deploy
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SSH key
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+      - name: Copy deploy files
+        run: scp -r deploy/docker-compose.prod.yml deploy/Caddyfile deploy/postgres deploy/scripts "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/opt/nexora/"
+      - name: Run deploy script (backup, deploy, smoke test, automatic rollback)
+        run: ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "cd /opt/nexora && ./scripts/deploy.sh ${{ inputs.image_tag }}"

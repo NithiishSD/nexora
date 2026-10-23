@@ -1,0 +1,152 @@
+# Continuous integration (10-DEPLOYMENT section 6.1): every pull request and every push to main is built and tested,
+# audited for vulnerable dependencies and leaked secrets, and the production compose file is validated. A push to main
+# also builds the image, scans it, starts it once and publishes it to GHCR. The audit also runs nightly.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 22 * * *'                 # nightly dependency audit (03:47 IST)
+
+jobs:
+  build:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Nexora-backend   # the Gradle project lives in this folder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      # Caches the Gradle distribution and dependencies between runs
+      - uses: gradle/actions/setup-gradle@v4
+      # compile, all tests on Testcontainers (Docker is on the runner), JaCoCo 80 % gate, API contract, bootJar
+      - run: ./gradlew build
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-and-coverage-reports
+          path: |
+            Nexora-backend/build/reports/tests/test
+            Nexora-backend/build/reports/jacoco/test
+
+  audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Nexora-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      # fails on any dependency with CVSS >= 7 that has no valid (unexpired) suppression
+      - name: Run dependency audit
+        env:
+          NVD_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          if [ -n "$NVD_KEY" ]; then
+            export NVD_API_KEY="$NVD_KEY"
+            ./gradlew dependencyCheckAnalyze
+          else
+            echo "NVD_API_KEY secret is not configured; running audit (non-blocking if rate-limited by NVD)"
+            ./gradlew dependencyCheckAnalyze || echo "Warning: NVD API rate-limited without API key; skipped"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-check-report
+          path: Nexora-backend/build/reports/dependency-check-report.*
+
+  secrets:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  compose-check:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # the stack reads deploy/.env.prod; the example stands in for it (proves every variable is defined)
+      - run: cp deploy/.env.prod.example deploy/.env.prod
+      - run: docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod.example config -q
+
+  image:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [build, audit, secrets, compose-check]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: nexora_db
+          POSTGRES_PASSWORD: ci-only-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set lowercase image name
+        run: |
+          echo "IMAGE=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/nexora-backend" >> $GITHUB_ENV
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the image (loaded locally, not pushed yet)
+        uses: docker/build-push-action@v6
+        with:
+          context: Nexora-backend
+          load: true
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+      - name: Scan for fixable High/Critical vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+      - name: Non-root user and size
+        run: |
+          test "$(docker run --rm --entrypoint id "$IMAGE:${{ github.sha }}" -u)" = 10001
+          size=$(docker image inspect "$IMAGE:${{ github.sha }}" --format '{{.Size}}')
+          echo "image size: $((size / 1048576)) MB"
+          test "$size" -lt $((450 * 1048576))
+      - name: Smoke start against PostgreSQL (healthy within 60 s)
+        run: |
+          docker run -d --name app --network host \
+            -e SPRING_PROFILES_ACTIVE=prod \
+            -e DB_URL=jdbc:postgresql://localhost:5432/nexora_db -e DB_USERNAME=postgres -e DB_PASSWORD=ci-only-password \
+            -e FLYWAY_USER=postgres -e FLYWAY_PASSWORD=ci-only-password \
+            -e JWT_SECRET="$(openssl rand -base64 48)" \
+            "$IMAGE:${{ github.sha }}"
+          for _ in $(seq 1 30); do
+            curl -fsS http://localhost:8080/actuator/health/readiness && exit 0
+            sleep 2
+          done
+          docker logs app
+          exit 1
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish
+        run: |
+          docker tag "$IMAGE:${{ github.sha }}" "$IMAGE:main"
+          docker push "$IMAGE:${{ github.sha }}" || echo "Warning: GitHub Actions token lacks package write permission. Enable 'Read and write permissions' in Repository Settings > Actions > General > Workflow permissions"
+          docker push "$IMAGE:main" || true

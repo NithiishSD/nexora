@@ -1,0 +1,11 @@
+# Only the Gradle wrapper, build files and sources go into the image build context.
+build/
+.gradle/
+.idea/
+.vscode/
+data/
+*.log
+.env
+.env.*
+openapi.json
+config/

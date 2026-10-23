@@ -1,0 +1,127 @@
+# Common settings loaded in every environment.
+spring:
+  profiles:
+    default: dev
+  application:
+    # Identifies this Spring Boot application in logs and monitoring tools.
+    name: nexora-backend
+  datasource:
+    # Use DB_URL when supplied; otherwise connect to the local PostgreSQL container.
+    url: ${DB_URL:jdbc:postgresql://localhost:5431/nexora_db}
+    # Environment variables override these local-development defaults.
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:nexora_dev}
+    hikari:
+      # At most 10 connections; a request waits at most 5 s for a free one.
+      maximum-pool-size: 10
+      connection-timeout: 5000
+      data-source-properties:
+        # Sent by the PostgreSQL driver when each connection opens (ADR-030): a transaction waits at most
+        # 5 s for a row lock (then 409 CONCURRENT_MODIFICATION, "retry") and a statement runs at most 30 s.
+        # Set here rather than in the URL, so it holds whatever DB_URL a deployment provides.
+        options: "-c lock_timeout=5000 -c statement_timeout=30000"
+  jpa:
+    hibernate:
+      # Flyway owns schema changes; Hibernate only verifies the schema at startup.
+      ddl-auto: validate
+    # Prevent database access from continuing into the controller/view layer.
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          # Store and read database timestamps consistently in UTC.
+          time_zone: UTC
+  flyway:
+    # Apply pending versioned migrations from db/migration at startup.
+    enabled: true
+  servlet:
+    multipart:
+      # Documents are at most 10 MB (FR-DOC-01, checked by the service with a clear message); the servlet limit
+      # sits a little above it, and anything larger is still a 400 (GlobalExceptionHandler).
+      max-file-size: 11MB
+      max-request-size: 12MB
+  mvc:
+    contentnegotiation:
+      # ?format=csv asks for the CSV export of a list or report (FR-RPT-16); without it, JSON as always.
+      favor-parameter: true
+      parameter-name: format
+      media-types:
+        csv: text/csv
+  data:
+    web:
+      pageable:
+        # A client may ask for size=500; it gets at most 100 rows per page (NFR-SEC-03).
+        max-page-size: 100
+
+server:
+  # Use SERVER_PORT when supplied; otherwise expose the API on port 8080.
+  port: ${SERVER_PORT:8080}
+  # 09-SECURITY section 8: no server banner, and error responses never carry a stack trace or exception message.
+  server-header: ""
+  error:
+    include-stacktrace: never
+    include-message: never
+
+springdoc:
+  # Safe default: API docs and Swagger UI are OFF everywhere.
+  # Only application-dev.yml switches them on, so prod never exposes the endpoint map.
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # health and info are public on the main port; prometheus and metrics answer only on nexora.management.port
+        # (SecurityConfig, NFR-OBS-04).
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      # /actuator/health/liveness and /readiness; readiness (Docker, Caddy) is UP only with the database (NFR-OBS-03)
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+      # component details only in dev (application-dev.yml)
+      show-details: never
+  info:
+    env:
+      # Publish the info.* properties below at GET /actuator/info (off by default in Spring Boot).
+      enabled: true
+
+info:
+  app:
+    # Major version of the HTTP API. The desktop client refuses to log in only when this differs from the
+    # major version it was built for (the build version may change freely between compatible releases).
+    api-version: 1
+
+nexora:
+  security:
+    # HS256 signing key for access tokens, at least 32 bytes. No default here on purpose:
+    # a missing JWT_SECRET stops startup (only application-dev.yml has a dev-only value).
+    jwt-secret: ${JWT_SECRET}
+    # Access tokens live 15 minutes, refresh tokens 7 days (ADR-014).
+    access-token-ttl: ${JWT_ACCESS_TTL:15m}
+    refresh-token-ttl: ${JWT_REFRESH_TTL:7d}
+    # Brute-force protection: this many consecutive wrong passwords lock the account for lockout-duration.
+    max-failed-logins: ${LOGIN_MAX_FAILURES:5}
+    lockout-duration: ${LOGIN_LOCKOUT:15m}
+  management:
+    # Second, unpublished port for metrics (NFR-OBS-04); 0 = no second port.
+    port: ${MANAGEMENT_PORT:8081}
+  rate-limit:
+    # NFR-SEC-11 / ADR-034: requests per minute, per client IP on /api/v1/auth/**, per user elsewhere.
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    auth-per-minute: 10
+    api-per-minute: 300
+  documents:
+    # Directory that holds uploaded files (each under a generated name). A mounted volume in production.
+    storage-root: ${DOCUMENTS_DIR:./data/documents}
+  bootstrap:
+    # First OWNER account, created only while the users table is empty (FR-AUTH-10).
+    # Set both on the very first start of a new installation, then remove them. Empty = no bootstrap.
+    owner-username: ${BOOTSTRAP_OWNER_USERNAME:}
+    owner-password: ${BOOTSTRAP_OWNER_PASSWORD:}

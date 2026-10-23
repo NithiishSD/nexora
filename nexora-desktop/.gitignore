@@ -1,0 +1,4 @@
+# IDE and Gradle build output of the desktop client
+bin/
+build/
+.gradle/

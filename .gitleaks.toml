@@ -1,0 +1,14 @@
+# Gitleaks configuration for SmartSilk / Nexora
+title = "SmartSilk Gitleaks Configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global ignore paths for documentation, mocks, and test fixtures"
+paths = [
+  '''docs/.*''',
+  '''Nexora-backend/src/test/.*''',
+  '''nexora-desktop/src/test/.*''',
+  '''smartledger-android/.*/test/.*'''
+]

@@ -1,0 +1,155 @@
+package com.nexora.desktop.viewmodel.auth
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.nexora.desktop.api.ApiClient
+import com.nexora.desktop.repository.ApiResult
+import com.nexora.desktop.ui.components.ErrorMessages
+import com.nexora.desktop.util.SettingsStore
+import com.nexora.desktop.util.s
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import java.net.URI
+import java.nio.file.Files
+import java.nio.file.Path
+
+data class ServerSetupState(
+    val address: String = "",
+    val addressError: String? = null,
+    val testing: Boolean = false,
+    /** Banner shown for a `http://localhost` development server. */
+    val developmentWarning: Boolean = false,
+    val serverVersion: String? = null,
+    val error: String? = null,
+    /** True only after a successful test with a matching API major version. */
+    val canContinue: Boolean = false,
+)
+
+/**
+ * S-AUTH-01: the first-run screen where the server address is entered and tested (06 section 3.1).
+ */
+class ServerSetupViewModel(private val api: ApiClient, private val settings: SettingsStore) : ViewModel() {
+
+    private val _state = MutableStateFlow(ServerSetupState(address = settings.current.serverUrl.orEmpty()))
+    val state: StateFlow<ServerSetupState> = _state.asStateFlow()
+
+    fun onAddressChange(text: String) {
+        // Any edit invalidates a previous successful test.
+        _state.update { it.copy(address = text, addressError = null, error = null, canContinue = false, serverVersion = null) }
+    }
+
+    fun selectLocalMode() {
+        onAddressChange("http://localhost:8080")
+        testConnection()
+    }
+
+    fun tryStartAndConnectLocal() {
+        viewModelScope.launch {
+            try {
+                val os = System.getProperty("os.name").lowercase()
+                val isWindows = os.contains("win")
+                val candidates = if (isWindows) {
+                    listOf(
+                        Path.of("Local-Engine", "start.bat"),
+                        Path.of("..", "Local-Engine", "start.bat"),
+                        Path.of("start.bat")
+                    )
+                } else {
+                    listOf(
+                        Path.of("Local-Engine", "start.sh"),
+                        Path.of("..", "Local-Engine", "start.sh"),
+                        Path.of("start.sh")
+                    )
+                }
+                val script = candidates.firstOrNull { Files.exists(it) }
+                if (script != null) {
+                    if (isWindows) {
+                        ProcessBuilder("cmd", "/c", "start", script.toAbsolutePath().toString()).start()
+                    } else {
+                        ProcessBuilder("bash", script.toAbsolutePath().toString()).start()
+                    }
+                    delay(2500)
+                }
+            } catch (_: Exception) {
+                // Best-effort invocation
+            }
+            selectLocalMode()
+        }
+    }
+
+    fun testConnection() {
+        val address = _state.value.address.trim().trimEnd('/')
+        val problem = addressProblem(address)
+        if (problem != null) {
+            _state.update { it.copy(addressError = problem) }
+            return
+        }
+        _state.update { it.copy(testing = true, error = null, developmentWarning = address.startsWith("http://")) }
+        viewModelScope.launch {
+            val health = api.getFrom<JsonObject>(address, "/actuator/health")
+            if (health is ApiResult.Failure) {
+                val message = if (health.error.isNetwork) {
+                    if (address.contains("localhost") || address.contains("127.0.0.1")) {
+                        "Local engine is not reachable. Double-click start.bat in the Local-Engine folder first."
+                    } else {
+                        s("setup.notReachable")
+                    }
+                } else {
+                    ErrorMessages.message(health.error)
+                }
+                _state.update { it.copy(testing = false, error = message) }
+                return@launch
+            }
+            val info = api.getFrom<JsonObject>(address, "/actuator/info").getOrNull()
+            // `app.api-version` is the contract version (decision log T9.04); `build.version` is only shown.
+            val apiVersion = (info?.get("app") as? JsonObject)?.get("api-version") as? JsonPrimitive
+            val buildVersion = ((info?.get("build") as? JsonObject)?.get("version") as? JsonPrimitive)?.content
+            val serverMajor = apiVersion?.content?.substringBefore('.')?.toIntOrNull()
+            _state.update {
+                when {
+                    serverMajor == null -> it.copy(testing = false, error = s("setup.notSmartSilk"))
+                    serverMajor != ApiClient.API_MAJOR -> it.copy(
+                        testing = false,
+                        serverVersion = buildVersion,
+                        error = s("setup.versionMismatch", ApiClient.API_MAJOR, serverMajor),
+                    )
+                    else -> it.copy(testing = false, serverVersion = buildVersion ?: apiVersion.content, canContinue = true)
+                }
+            }
+        }
+    }
+
+    /** Stores the tested address; the caller then opens the login screen. */
+    fun saveAndContinue(): Boolean {
+        val current = _state.value
+        if (!current.canContinue) return false
+        settings.update { it.copy(serverUrl = current.address.trim().trimEnd('/')) }
+        return true
+    }
+
+    companion object {
+        /**
+         * Tokens must never cross a network unencrypted, so only `https://` is accepted; plain `http://` is allowed
+         * for a server on this same computer during development (NFR-SEC-01, 06 section 11 #11).
+         */
+        fun addressProblem(address: String): String? {
+            val uri = try {
+                URI(address)
+            } catch (_: Exception) {
+                return s("setup.invalidAddress")
+            }
+            val host = uri.host ?: return s("setup.invalidAddress")
+            return when (uri.scheme?.lowercase()) {
+                "https" -> null
+                "http" -> if (host == "localhost" || host == "127.0.0.1") null else s("setup.httpsRequired")
+                else -> s("setup.invalidAddress")
+            }
+        }
+    }
+}

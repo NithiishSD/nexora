@@ -19,10 +19,11 @@ append-only ledgers, so every figure can be traced to the entries behind it.
 If you are an end-user, business manager, or tester, **you do not need to clone the source code, install Java, or build the project.** Pre-built standalone application packages are automatically built by CI and available under **GitHub Actions $\rightarrow$ Desktop $\rightarrow$ Artifacts**.
 
 ### 1. Download Options
-| Platform | Artifact Name | Contents |
-|:---|:---|:---|
-| **Windows** | `smartsilk-msi` | `SmartSilk-1.0.0.msi` (Setup Wizard) & `SmartSilk-Windows-Portable.zip` (Portable) |
-| **Linux** | `smartsilk-deb` | `smartsilk_1.0.0_amd64.deb` (Debian/Ubuntu native package) |
+| Platform | Artifact Name | Download Contents | Description |
+|:---|:---|:---|:---|
+| **Windows Installer** | `smartsilk-windows-installer` | `SmartSilk-1.0.0.msi` | Standard Windows setup wizard (installs to Program Files) |
+| **Windows Portable** | `smartsilk-windows-portable` | `SmartSilk-Windows-Portable.zip` | Standalone portable application (extract and run directly) |
+| **Linux Package** | `smartsilk-linux-deb` | `smartsilk_1.0.0_amd64.deb` | Native Debian/Ubuntu package (`sudo dpkg -i ...`) |
 
 ---
 

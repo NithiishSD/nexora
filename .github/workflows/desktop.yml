@@ -52,13 +52,33 @@ jobs:
         shell: pwsh
         run: |
           ./gradlew.bat check packageDistributionForCurrentOS createDistributable
-          Compress-Archive -Path build/compose/binaries/main/app/* -DestinationPath build/compose/binaries/main/msi/SmartSilk-Windows-Portable.zip
+          New-Item -ItemType Directory -Force -Path build/compose/binaries/main/portable
+          Compress-Archive -Path build/compose/binaries/main/app/* -DestinationPath build/compose/binaries/main/portable/SmartSilk-Windows-Portable.zip
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload Linux package (.deb)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
         with:
-          name: smartsilk-${{ matrix.installer }}
-          path: nexora-desktop/build/compose/binaries/main/${{ matrix.installer }}/*
+          name: smartsilk-linux-deb
+          path: nexora-desktop/build/compose/binaries/main/deb/*.deb
           if-no-files-found: error
+
+      - name: Upload Windows MSI installer (.msi)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: smartsilk-windows-installer
+          path: nexora-desktop/build/compose/binaries/main/msi/*.msi
+          if-no-files-found: error
+
+      - name: Upload Windows Portable zip (.zip)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: smartsilk-windows-portable
+          path: nexora-desktop/build/compose/binaries/main/portable/*.zip
+          if-no-files-found: error
+
 
       # Keep the test report when something fails, so it can be downloaded
       - uses: actions/upload-artifact@v4

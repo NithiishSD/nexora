@@ -10509,8 +10509,25 @@
       }
     },
     "/api/v1/settings/backup/export" : {
-      "post" : {
+      "get" : {
         "operationId" : "exportBackup",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : { },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "system-setting-controller" ]
+      },
+      "post" : {
+        "operationId" : "exportBackup_1",
         "responses" : {
           "200" : {
             "content" : {

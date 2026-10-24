@@ -56,4 +56,15 @@ class SystemSettingApiTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.version").value("1.0.0"))
                 .andExpect(jsonPath("$.settings").isNotEmpty());
     }
+
+    @Test
+    @DisplayName("export backup with GET returns JSON snapshot of settings and metadata")
+    void exportBackupGet_returnsJsonSnapshot() throws Exception {
+        mockMvc.perform(get("/api/v1/settings/backup/export")
+                        .header("Authorization", AuthTokens.bearer(tokens.owner())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.timestamp").isNotEmpty())
+                .andExpect(jsonPath("$.version").value("1.0.0"))
+                .andExpect(jsonPath("$.settings").isNotEmpty());
+    }
 }

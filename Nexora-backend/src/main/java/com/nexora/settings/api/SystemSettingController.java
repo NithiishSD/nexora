@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.nexora.settings.api.dto.UpdateSettingsRequest;
@@ -47,7 +48,7 @@ public class SystemSettingController {
         return settingService.getCategorySettingsMasked(category);
     }
 
-    @PostMapping("/backup/export")
+    @RequestMapping(value = "/backup/export", method = {RequestMethod.GET, RequestMethod.POST})
     @PreAuthorize("hasAuthority('FINANCE_MANAGE')")
     public Map<String, Object> exportBackup() {
         return settingService.createBackupExport();

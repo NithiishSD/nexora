@@ -1,23 +1,35 @@
 package com.nexora.desktop.ui.dashboard
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.nexora.desktop.api.dto.DashboardResponse
 import com.nexora.desktop.ui.components.FigureTile
@@ -25,7 +37,6 @@ import com.nexora.desktop.ui.components.FlagChip
 import com.nexora.desktop.ui.components.LoadBanner
 import com.nexora.desktop.ui.components.ReloadOn
 import com.nexora.desktop.ui.components.ScreenHeader
-import com.nexora.desktop.ui.components.Section
 import com.nexora.desktop.ui.components.enumLabel
 import com.nexora.desktop.ui.components.screenViewModel
 import com.nexora.desktop.ui.theme.AppColors
@@ -68,17 +79,52 @@ fun DashboardScreen(nav: NavigationViewModel, reloadTick: Int) {
 }
 
 @Composable
+private fun DashboardBox(
+    title: String,
+    modifier: Modifier = Modifier,
+    action: (@Composable () -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth().padding(vertical = 6.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                action?.invoke()
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+            content()
+        }
+    }
+}
+
+@Composable
 private fun DashboardBands(d: DashboardResponse, nav: NavigationViewModel) {
     val money = { nav.open(NavSection.MONEY) }
-    Section(s("dashboard.moneyAvailable")) {
+    DashboardBox(s("dashboard.moneyAvailable")) {
         FlowRow {
             FigureTile(s("dashboard.totalAvailable"), money(d.totalAvailable), onClick = money)
             FigureTile(s("dashboard.cash"), money(d.cash), onClick = money)
             d.banks.forEach { FigureTile(it.account.accountName, money(it.balance), onClick = money) }
         }
     }
-    HorizontalDivider()
-    Section(s("dashboard.obligations")) {
+    DashboardBox(s("dashboard.obligations")) {
         FlowRow {
             FigureTile(s("dashboard.customerReceivables"), money(d.customerReceivables), onClick = { nav.push(Screen.Report("customer-outstanding")) })
             FigureTile(s("dashboard.customerAdvances"), money(d.customerAdvances))
@@ -90,8 +136,7 @@ private fun DashboardBands(d: DashboardResponse, nav: NavigationViewModel) {
             FigureTile(s("dashboard.chitCommitments"), money(d.chitMonthlyCommitments), onClick = { nav.open(NavSection.CHITS) })
         }
     }
-    HorizontalDivider()
-    Section(s("dashboard.stockAndWork")) {
+    DashboardBox(s("dashboard.stockAndWork")) {
         val stock = { nav.open(NavSection.INVENTORY) }
         FlowRow {
             FigureTile(s("dashboard.rawSilk"), weight(d.stock.rawSilkKg), onClick = stock)
@@ -112,39 +157,232 @@ private fun DashboardBands(d: DashboardResponse, nav: NavigationViewModel) {
             FigureTile(s("dashboard.openJobs"), d.openOutsourcingJobs.toString(), onClick = { nav.open(NavSection.OUTSOURCING) })
         }
     }
-    HorizontalDivider()
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.weight(1f)) {
-            Section(s("dashboard.dues")) {
-                if (d.upcomingSupplierDues.isEmpty()) Text(s("dashboard.noDues"))
-                d.upcomingSupplierDues.forEach { due ->
+            DashboardBox(
+                title = s("dashboard.dues"),
+                action = {
+                    TextButton(onClick = { nav.push(Screen.SupplierPayables) }) {
+                        Text(s("common.show"), style = MaterialTheme.typography.labelMedium)
+                    }
+                },
+            ) {
+                if (d.upcomingSupplierDues.isEmpty()) {
+                    Text(
+                        s("dashboard.noDues"),
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(vertical = 12.dp),
+                    )
+                } else {
                     Row(
-                        Modifier.fillMaxWidth().clickable { nav.push(Screen.PurchaseDetail(due.purchaseId)) }.padding(vertical = 6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(due.supplier.name, Modifier.weight(1f))
-                        Text(due.purchaseNumber, Modifier.width(140.dp))
-                        Text(Dates.formatIso(due.dueDate), Modifier.width(110.dp))
-                        Text(money(due.outstanding), Modifier.width(140.dp))
-                        if (due.overdue) FlagChip(s("flag.overdue", due.overdueDays))
+                        Text(
+                            s("purchase.supplier"),
+                            Modifier.weight(1.2f),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            s("purchase.number"),
+                            Modifier.width(110.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            s("purchase.dueDate"),
+                            Modifier.width(95.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            s("common.outstanding"),
+                            Modifier.width(115.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.End,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            s("common.status"),
+                            Modifier.width(85.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    d.upcomingSupplierDues.forEach { due ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { nav.push(Screen.PurchaseDetail(due.purchaseId)) }
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                due.supplier.name,
+                                Modifier.weight(1.2f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Text(
+                                due.purchaseNumber,
+                                Modifier.width(110.dp),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Text(
+                                Dates.formatIso(due.dueDate),
+                                Modifier.width(95.dp),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Text(
+                                money(due.outstanding),
+                                Modifier.width(115.dp),
+                                textAlign = TextAlign.End,
+                                fontWeight = FontWeight.SemiBold,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Box(
+                                Modifier.width(85.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (due.overdue) {
+                                    FlagChip(s("flag.overdue", due.overdueDays))
+                                } else {
+                                    Text(
+                                        "On Time",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.outline,
+                                    )
+                                }
+                            }
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
                     }
                 }
             }
         }
         Column(Modifier.weight(1f)) {
-            Section(s("dashboard.recentTransactions")) {
-                d.recentTransactions.forEach { t ->
+            DashboardBox(
+                title = s("dashboard.recentTransactions"),
+                action = {
+                    TextButton(onClick = { nav.open(NavSection.MONEY) }) {
+                        Text(s("common.show"), style = MaterialTheme.typography.labelMedium)
+                    }
+                },
+            ) {
+                if (d.recentTransactions.isEmpty()) {
+                    Text(
+                        s("money.noTransactions"),
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(vertical = 12.dp),
+                    )
+                } else {
                     Row(
-                        Modifier.fillMaxWidth().clickable { nav.push(Screen.Transactions(t.account.id)) }.padding(vertical = 6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(Dates.formatIso(t.transactionDate), Modifier.width(110.dp))
-                        Text(enumLabel("TransactionType", t.transactionType), Modifier.weight(1f))
-                        Text(t.account.accountName, Modifier.width(140.dp))
                         Text(
-                            (if (t.direction == "OUT") s("money.out") else s("money.in")) + " " + money(t.amount),
-                            color = if (t.direction == "OUT") AppColors.negative else MaterialTheme.colorScheme.onSurface,
+                            s("common.date"),
+                            Modifier.width(95.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        Text(
+                            s("money.type"),
+                            Modifier.weight(1.2f),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            s("account.name"),
+                            Modifier.width(120.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            s("common.amount"),
+                            Modifier.width(125.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.End,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            "",
+                            Modifier.width(36.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
+                    d.recentTransactions.forEach { t ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { nav.push(Screen.Transactions(t.account.id)) }
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                Dates.formatIso(t.transactionDate),
+                                Modifier.width(95.dp),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Text(
+                                enumLabel("TransactionType", t.transactionType),
+                                Modifier.weight(1.2f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Text(
+                                t.account.accountName,
+                                Modifier.width(120.dp),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Text(
+                                (if (t.direction == "OUT") "- " else "+ ") + money(t.amount),
+                                Modifier.width(125.dp),
+                                textAlign = TextAlign.End,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (t.direction == "OUT") AppColors.negative else MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Box(
+                                Modifier.width(36.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    "→",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
                     }
                 }
             }

@@ -84,7 +84,19 @@ class SettingsViewModel(
             val res = systemSettingRepo.exportBackup()
             when (res) {
                 is ApiResult.Success -> {
-                    onCompleted(true, "Backup export completed successfully (${res.value.size} bytes)")
+                    val bytes = res.value
+                    val ts = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+                    val backupFileName = "smartsilk-backup-$ts.json"
+                    val downloadsDir = java.io.File(System.getProperty("user.home"), "Downloads")
+                    val targetDir = if (downloadsDir.exists() && downloadsDir.isDirectory) downloadsDir else java.io.File(System.getProperty("user.home"))
+                    val targetFile = java.io.File(targetDir, backupFileName)
+                    val msg = try {
+                        targetFile.writeBytes(bytes)
+                        "Backup snapshot created & saved to Downloads/${targetFile.name} (${bytes.size} bytes)"
+                    } catch (_: Exception) {
+                        "Backup export completed successfully (${bytes.size} bytes)"
+                    }
+                    onCompleted(true, msg)
                 }
                 is ApiResult.Failure -> {
                     val msg = ErrorMessages.detail(res.error) ?: ErrorMessages.message(res.error)

@@ -336,9 +336,21 @@ fun SettingsScreen(nav: NavigationViewModel) {
         var aiEnabled by remember(aiConfig["enabled"]) { mutableStateOf(aiConfig["enabled"] == "true") }
         var aiKey by remember(aiConfig["gemini_api_key"]) { mutableStateOf(aiConfig["gemini_api_key"] ?: "") }
 
+        val gstConfig = sysSettings["GST_EINVOICE"] ?: emptyMap()
+        var gstEnabled by remember(gstConfig["enabled"]) { mutableStateOf(gstConfig["enabled"] == "true") }
+        var gstClientId by remember(gstConfig["client_id"]) { mutableStateOf(gstConfig["client_id"] ?: "") }
+        var gstClientSecret by remember(gstConfig["client_secret"]) { mutableStateOf(gstConfig["client_secret"] ?: "") }
+
+        val bankConfig = sysSettings["BANKING"] ?: emptyMap()
+        var bankEnabled by remember(bankConfig["enabled"]) { mutableStateOf(bankConfig["enabled"] == "true") }
+        var bankBaseUrl by remember(bankConfig["base_url"]) { mutableStateOf(bankConfig["base_url"] ?: "") }
+        var bankClientId by remember(bankConfig["client_id"]) { mutableStateOf(bankConfig["client_id"] ?: "") }
+        var bankClientSecret by remember(bankConfig["client_secret"]) { mutableStateOf(bankConfig["client_secret"] ?: "") }
+
         if (nav.can("FINANCE_MANAGE")) {
             Section("Integrations (Optional)") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // 1. WhatsApp
                     Text("WhatsApp Automated Reminders", style = MaterialTheme.typography.titleSmall)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = waEnabled, onCheckedChange = { waEnabled = it })
@@ -350,18 +362,19 @@ fun SettingsScreen(nav: NavigationViewModel) {
                                 value = waPhoneId,
                                 onValueChange = { waPhoneId = it },
                                 label = { Text("Phone Number ID") },
-                                modifier = Modifier.width(260.dp)
+                                modifier = Modifier.width(260.dp),
                             )
                             OutlinedTextField(
                                 value = waToken,
                                 onValueChange = { waToken = it },
                                 label = { Text("Access Token") },
-                                modifier = Modifier.width(320.dp)
+                                modifier = Modifier.width(320.dp),
                             )
                         }
                     }
 
-                    Text("AI Document & Bill Scanner", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
+                    // 2. AI Document OCR
+                    Text("AI Document & Bill Scanner", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = aiEnabled, onCheckedChange = { aiEnabled = it })
                         Text("Enable Gemini AI Supplier Bill OCR")
@@ -371,21 +384,86 @@ fun SettingsScreen(nav: NavigationViewModel) {
                             value = aiKey,
                             onValueChange = { aiKey = it },
                             label = { Text("Gemini API Key") },
-                            modifier = Modifier.width(360.dp)
+                            modifier = Modifier.width(360.dp),
                         )
+                    }
+
+                    // 3. GST e-Invoicing Portal
+                    Text("GST e-Invoicing & E-Way Bill Portal", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = gstEnabled, onCheckedChange = { gstEnabled = it })
+                        Text("Enable Automated IRN & E-Way Bill Generation")
+                    }
+                    if (gstEnabled) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedTextField(
+                                value = gstClientId,
+                                onValueChange = { gstClientId = it },
+                                label = { Text("GST Portal Client ID") },
+                                modifier = Modifier.width(260.dp),
+                            )
+                            OutlinedTextField(
+                                value = gstClientSecret,
+                                onValueChange = { gstClientSecret = it },
+                                label = { Text("GST Portal Client Secret") },
+                                modifier = Modifier.width(320.dp),
+                            )
+                        }
+                    }
+
+                    // 4. Automated Bank Statement Reconciliation
+                    Text("Bank Statement & Open Banking Feeds", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = bankEnabled, onCheckedChange = { bankEnabled = it })
+                        Text("Enable Automated Bank Reconciliation Feeds")
+                    }
+                    if (bankEnabled) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedTextField(
+                                value = bankBaseUrl,
+                                onValueChange = { bankBaseUrl = it },
+                                label = { Text("Bank API Base URL") },
+                                modifier = Modifier.width(280.dp),
+                            )
+                            OutlinedTextField(
+                                value = bankClientId,
+                                onValueChange = { bankClientId = it },
+                                label = { Text("Bank Client ID") },
+                                modifier = Modifier.width(240.dp),
+                            )
+                            OutlinedTextField(
+                                value = bankClientSecret,
+                                onValueChange = { bankClientSecret = it },
+                                label = { Text("Bank Client Secret") },
+                                modifier = Modifier.width(260.dp),
+                            )
+                        }
                     }
 
                     Button(onClick = {
                         vm.updateSystemCategory(
                             "WHATSAPP",
-                            mapOf("enabled" to waEnabled.toString(), "phone_number_id" to waPhoneId, "access_token" to waToken)
+                            mapOf("enabled" to waEnabled.toString(), "phone_number_id" to waPhoneId, "access_token" to waToken),
                         )
                         vm.updateSystemCategory(
                             "AI_OCR",
-                            mapOf("enabled" to aiEnabled.toString(), "gemini_api_key" to aiKey)
+                            mapOf("enabled" to aiEnabled.toString(), "gemini_api_key" to aiKey),
+                        )
+                        vm.updateSystemCategory(
+                            "GST_EINVOICE",
+                            mapOf("enabled" to gstEnabled.toString(), "client_id" to gstClientId, "client_secret" to gstClientSecret),
+                        )
+                        vm.updateSystemCategory(
+                            "BANKING",
+                            mapOf(
+                                "enabled" to bankEnabled.toString(),
+                                "base_url" to bankBaseUrl,
+                                "client_id" to bankClientId,
+                                "client_secret" to bankClientSecret,
+                            ),
                         )
                     }, modifier = Modifier.padding(top = 8.dp)) {
-                        Text("Save Integrations")
+                        Text("Save All Integrations")
                     }
                 }
             }

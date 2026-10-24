@@ -88,6 +88,16 @@ class ServerSetupViewModel(private val api: ApiClient, private val settings: Set
         }
         _state.update { it.copy(testing = true, error = null, developmentWarning = address.startsWith("http://")) }
         viewModelScope.launch {
+            val isConnectingToLocalEngine = address == DEFAULT_LOCAL_URL || address == "http://localhost:8088"
+            if (isConnectingToLocalEngine && !com.nexora.desktop.util.LocalEngineManager.isEngineRunning()) {
+                val started = com.nexora.desktop.util.LocalEngineManager.ensureEngineStarted { msg ->
+                    _state.update { it.copy(error = msg) }
+                }
+                if (!started) {
+                    _state.update { it.copy(testing = false) }
+                    return@launch
+                }
+            }
             val health = api.getFrom<JsonObject>(address, "/actuator/health")
             if (health is ApiResult.Failure) {
                 val message = if (health.error.isNetwork) s("setup.notReachable") else ErrorMessages.message(health.error)

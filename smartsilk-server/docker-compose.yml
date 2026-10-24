@@ -1,0 +1,57 @@
+name: smartsilk-server
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: smartsilk-server-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-smartsilk_ledger_db}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-smartsilk_server_secure_password}
+    volumes:
+      - smartsilk_server_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-smartsilk_ledger_db}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - smartsilk-internal
+
+  backend:
+    image: ghcr.io/nithiishsd/nexora-backend:latest
+    container_name: smartsilk-server-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 8080
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-smartsilk_ledger_db}
+      DB_USERNAME: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-smartsilk_server_secure_password}
+      FLYWAY_USER: ${DB_USER:-postgres}
+      FLYWAY_PASSWORD: ${DB_PASSWORD:-smartsilk_server_secure_password}
+      JWT_SECRET: ${JWT_SECRET:-smartsilk-server-production-master-jwt-secret-key-32chars}
+    ports:
+      - "${SERVER_PORT:-8088}:8080"
+    volumes:
+      - smartsilk_server_documents_data:/var/lib/nexora/documents
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
+    networks:
+      - smartsilk-internal
+
+volumes:
+  smartsilk_server_postgres_data:
+  smartsilk_server_documents_data:
+
+networks:
+  smartsilk-internal:
+    driver: bridge

@@ -1,0 +1,18 @@
+spring:
+  config:
+    activate:
+      on-profile: standalone
+
+server:
+  port: 8088
+
+nexora:
+  security:
+    jwt-secret: ${JWT_SECRET:smartsilk-standalone-local-offline-jwt-secret-key-32chars-min}
+  management:
+    port: 0
+
+management:
+  endpoint:
+    health:
+      show-details: always

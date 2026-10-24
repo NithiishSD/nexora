@@ -75,9 +75,13 @@ compose.desktop {
             description = "SmartSilk Business Ledger - Silk yarn trading, inventory, orders, and accounting"
             vendor = "SmartSilk"
             copyright = "Copyright 2026 SmartSilk"
-            // jpackage bundles a trimmed Java 21 runtime: only these JDK modules besides the defaults
-            // (from ./gradlew suggestRuntimeModules, plus jdk.crypto.ec for HTTPS with elliptic-curve keys).
-            modules("java.instrument", "java.management", "jdk.security.auth", "jdk.unsupported", "jdk.crypto.ec")
+            appResourcesRootDir.set(project.layout.projectDirectory.dir("extra-resources"))
+            // jpackage bundles a trimmed Java 21 runtime: includes desktop requirements and SQL/naming
+            // modules for running the standalone embedded PostgreSQL backend engine.
+            modules(
+                "java.instrument", "java.management", "jdk.security.auth", "jdk.unsupported", "jdk.crypto.ec",
+                "java.sql", "java.sql.rowset", "java.naming", "java.net.http", "jdk.zipfs"
+            )
             windows {
                 iconFile.set(project.file("packaging/icon.ico"))
                 menu = true            // Start-menu entry

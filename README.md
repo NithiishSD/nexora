@@ -19,19 +19,34 @@ append-only ledgers, so every figure can be traced to the entries behind it.
 If you are an end-user, business manager, or tester, **you do not need to clone the source code, install Java, or build the project.** Pre-built standalone application packages are automatically built by CI and available under **GitHub Actions $\rightarrow$ Desktop $\rightarrow$ Artifacts**.
 
 ### 1. Download Options
-| Platform | Artifact Name | Download Contents | Description |
+| Platform / Target | Artifact Name | Download Contents | Description |
 |:---|:---|:---|:---|
-| **Windows Installer** | `smartsilk-windows-installer` | `SmartSilk-1.0.0.msi` | Standard Windows setup wizard (installs to Program Files) |
-| **Windows Portable** | `smartsilk-windows-portable` | `SmartSilk-Windows-Portable.zip` | Standalone portable application (extract and run directly) |
-| **Linux Package** | `smartsilk-linux-deb` | `smartsilk_1.0.0_amd64.deb` | Native Debian/Ubuntu package (`sudo dpkg -i ...`) |
+| **Windows All-in-One Installer** | `smartsilk-windows-installer` | `SmartSilk-1.0.0.msi` | Complete standalone Windows app with embedded backend & DB. Installs to Program Files. |
+| **Windows Portable** | `smartsilk-windows-portable` | `SmartSilk-Windows-Portable.zip` | Standalone portable application (extract and run directly without install). |
+| **Linux All-in-One Package** | `smartsilk-linux-deb` | `smartsilk_1.0.0_amd64.deb` | Complete standalone Debian/Ubuntu package with embedded backend & DB. |
+| **Dedicated Server Engine** | `smartsilk-server-engine` | `smartsilk-server/` | Standalone Docker backend & PostgreSQL 17 server for shops/cloud hosting. |
 
 ---
 
-### 2. Windows Installation & Uninstallation
+### 2. Standalone Server Engine Setup (For Multi-User / Cloud / Shop Host)
+
+If you want to host the SmartSilk business engine on a central machine (e.g. billing counter PC, office server, or cloud VPS) so multiple desktop devices can connect over the local network or internet:
+
+1. Download **`smartsilk-server-engine`** and extract it on the host server.
+2. Start the server engine:
+   - **On Linux / macOS:** Run `./start-server.sh`
+   - **On Windows:** Double-click `start-server.bat`
+3. The engine will initialize PostgreSQL 17 and the backend service on port `8088`.
+4. On any client PC with SmartSilk installed, open **SmartSilk**, select **Remote / Cloud Server**, enter the server IP (e.g. `http://<SERVER-IP>:8088`), and connect!
+
+---
+
+### 3. Windows Installation & Uninstallation (All-in-One Desktop)
 
 #### Installation:
 - **Standard Installer (`.msi`):** Double-click `SmartSilk-1.0.0.msi` and follow the setup wizard. It installs into `Program Files` and creates a Desktop shortcut.
 - **Portable Zip (`.zip`):** Extract `SmartSilk-Windows-Portable.zip` to any folder and double-click `SmartSilk.exe`. No installation required!
+- **Running Locally:** The built-in local engine and embedded PostgreSQL database start automatically. Zero Docker or external database needed!
 
 #### Uninstallation:
 1. Open Windows **Settings** $\rightarrow$ **Apps** $\rightarrow$ **Installed Apps** (or Control Panel $\rightarrow$ Programs and Features).
@@ -40,7 +55,7 @@ If you are an end-user, business manager, or tester, **you do not need to clone 
 
 ---
 
-### 3. Linux Installation & Uninstallation
+### 4. Linux Installation & Uninstallation (All-in-One Desktop)
 
 #### Installation:
 Download `smartsilk_1.0.0_amd64.deb` and install via terminal:

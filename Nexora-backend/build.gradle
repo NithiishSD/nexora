@@ -48,6 +48,9 @@ dependencies {
 	// springdoc 3.x is the line built for Spring Boot 4 (2.x targets Boot 3).
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
 	runtimeOnly 'org.postgresql:postgresql'
+	implementation 'io.zonky.test:embedded-postgres:2.1.0'
+	runtimeOnly 'io.zonky.test.postgres:embedded-postgres-binaries-windows-amd64:17.5.0'
+	runtimeOnly 'io.zonky.test.postgres:embedded-postgres-binaries-linux-amd64:17.5.0'
 	testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-flyway-test'
@@ -77,7 +80,8 @@ tasks.named('test') {
 	// the frozen API contract is a test input: editing it reruns the tests (OpenApiExportTest compares it)
 	inputs.files('openapi.json').withPropertyName('apiContract')
 	// files outside this project that tests read: a change to any of them reruns the tests
-	inputs.files('../README.md', '../deploy/scripts/reconciliation.sql', '../deploy/postgres/10-roles.sh',
+	inputs.files('../docs/02-REQUIREMENTS.md', '../docs/07-TASKS.md', '../docs/08-TESTING.md', '../docs/RUNBOOK.md',
+			'../README.md', '../deploy/scripts/reconciliation.sql', '../deploy/postgres/10-roles.sh',
 			'../deploy/.env.prod.example').withPropertyName('outsideFiles')
 	inputs.dir('../nexora-desktop/src/test/kotlin').withPropertyName('desktopTests')
 	// ./gradlew test --tests OpenApiExportTest -PupdateOpenapi: rewrite openapi.json after an intended API change
@@ -129,9 +133,8 @@ dependencyCheck {
 	suppressionFile = 'config/dependency-check-suppressions.xml'
 	nvd {
 		// only when set: an empty key is refused by NVD, while no key at all is allowed (just rate-limited)
-		def key = System.getenv('NVD_API_KEY')
-		if (key != null && !key.trim().isEmpty()) {
-			apiKey = key.trim()
+		if (System.getenv('NVD_API_KEY')) {
+			apiKey = System.getenv('NVD_API_KEY')
 		}
 	}
 	analyzers {

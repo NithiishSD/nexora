@@ -21,11 +21,11 @@ docker compose up -d
 echo ""
 echo "Waiting for SmartSilk local engine to become ready..."
 for i in {1..30}; do
-    if curl -s http://127.0.0.1:8080/actuator/health/readiness | grep -q "UP"; then
+    if curl -s http://127.0.0.1:8088/actuator/health/readiness | grep -q "UP"; then
         echo ""
         echo "=========================================="
         echo "  SmartSilk Engine is LIVE and READY!    "
-        echo "  Address: http://localhost:8080         "
+        echo "  Address: http://localhost:8088         "
         echo "=========================================="
         echo "You can now launch the SmartSilk desktop application."
         exit 0

@@ -1,26 +1,31 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$DIR"
+cd "$(dirname "$0")"
 
 echo "========================================================"
 echo "      SmartSilk Local Engine - Clean Uninstaller        "
 echo "========================================================"
-read -p "Are you sure you want to stop and remove local engine containers? (y/N): " confirm
-if [[ ! "$confirm" =~ ^[yY]$ ]]; then
+echo "This will stop the local database and backend containers."
+echo ""
+read -r -p "Are you sure you want to stop and remove all local containers? (Y/N): " CONFIRM
+if [ "$CONFIRM" != "Y" ] && [ "$CONFIRM" != "y" ]; then
     echo "Cancelled."
     exit 0
 fi
 
-if command -v docker &> /dev/null; then
-    docker compose down -v 2>/dev/null || true
-    echo "Containers and networks removed."
+if command -v docker >/dev/null 2>&1; then
+    echo "Stopping and removing containers and networks..."
+    docker compose down -v
 fi
 
-read -p "Do you also want to permanently delete local database files in ./data? (y/N): " del_data
-if [[ "$del_data" =~ ^[yY]$ ]]; then
-    rm -rf data/
-    echo "Local database files removed."
+echo ""
+read -r -p "Do you also want to delete all company database files in ./data? (Y/N): " DEL_DATA
+if [ "$DEL_DATA" = "Y" ] || [ "$DEL_DATA" = "y" ]; then
+    if [ -d "data" ]; then
+        rm -rf data
+        echo "Local database data removed."
+    fi
 fi
 
+echo ""
 echo "SmartSilk Local Engine has been cleanly removed."

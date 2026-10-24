@@ -12,12 +12,12 @@ Run SmartSilk 100% locally on your computer with complete data privacy, zero clo
   ```bash
   ./start.sh
   ```
-The database and backend engine will automatically start in the background and bind safely to `http://localhost:8080`.
+The database and backend engine will automatically start in the background and bind safely to dedicated isolated port `http://localhost:8088` (preventing any conflicts with developer services).
 
 #### 2. Open SmartSilk Desktop App
 - Install the SmartSilk app using `smartsilk_1.0.0_amd64.deb` (Linux) or `SmartSilk.msi` (Windows).
 - Double-click the **SmartSilk** desktop icon.
-- It will automatically connect to `http://localhost:8080`.
+- It will automatically connect to `http://localhost:8088`.
 
 #### 3. First-Run Setup (Takes 30 seconds)
 - The **First-Run Setup Wizard** will appear.

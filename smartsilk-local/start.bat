@@ -20,8 +20,9 @@ docker compose up -d
 echo.
 echo ==========================================
 echo   SmartSilk Local Engine is RUNNING!      
-echo   Address: http://localhost:8080          
+echo   Address: http://localhost:8088          
 echo ==========================================
 echo You can now open the SmartSilk application!
 echo.
 pause
+

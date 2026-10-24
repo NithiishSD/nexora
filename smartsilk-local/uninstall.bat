@@ -30,5 +30,5 @@ if /i "%DEL_DATA%"=="Y" (
 )
 
 echo.
-echo SmartSilk Local Engine has been removed.
+echo SmartSilk Local Engine has been cleanly removed.
 pause

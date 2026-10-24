@@ -9,50 +9,69 @@ append-only ledgers, so every figure can be traced to the entries behind it.
 |---|---|---|
 | Server | `Nexora-backend/` | Java 21, Spring Boot 4, PostgreSQL 17, Flyway |
 | Desktop app | `nexora-desktop/` | Kotlin, Compose Desktop (Windows and Linux) |
-| Android app | `smartledger-android/` | Android, Jetpack Compose, Kotlin |
-| Standalone local runner | `smartsilk-local/` | Docker Compose, Shell / Batch 1-click scripts |
 | Production deployment | `deploy/` | Docker Compose, Caddy (HTTPS), scripts for deploy, backup, restore and monitoring |
+| Documentation | `docs/` | requirements, architecture, data model, API, testing, security, deployment, runbook |
 
 ---
 
-## Download & Run (For End Users — No Source Code Required)
+## Download, Install & Uninstall (For End Users — No Source Code Needed)
 
-If you are a business user or client, **you do NOT need to clone this repository, install development tools, or compile code.** You can download, install, and run the pre-built application directly.
+If you are an end-user, business manager, or tester, **you do not need to clone the source code, install Java, or build the project.** Pre-built standalone application packages are automatically built by CI and available under **GitHub Actions $\rightarrow$ Desktop $\rightarrow$ Artifacts**.
 
-### 1. Download the Windows Release Package
-Get the compiled distribution package `SmartSilk-Windows-v1.0.0.zip` (available under GitHub Releases / Artifacts):
-- **`1-Install-SmartSilk.msi`** — Complete desktop application installer with bundled runtime (no Java installation required).
-- **`Local-Engine/`** — 1-click local database and backend engine (for running 100% offline without an external cloud server).
-- **`Readme-Instructions.txt`** — Quick-start instructions.
-
-### 2. Install SmartSilk on Windows
-1. Double-click **`1-Install-SmartSilk.msi`**.
-2. Follow the standard Windows setup wizard (Next $\rightarrow$ Install).
-3. A **SmartSilk** shortcut will be added to your **Desktop** and **Start Menu**.
-
-### 3. Launch & Connect: Choose Your Mode
-
-When opening SmartSilk, the connection screen offers two options:
-
-* **Option 1: Run Locally on This PC (Offline Standalone)**
-  - Ensure [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/) is running.
-  - In the `Local-Engine` folder, double-click **`start.bat`** *(or click "Use Local Engine" inside the app to auto-launch it)*.
-  - In SmartSilk, click **"Use Local Engine (localhost)"**.
-  - All your company data is stored safely and privately on your computer in `Local-Engine/data/`.
-  - To stop when finished, double-click **`stop.bat`**.
-
-* **Option 2: Connect to Remote / Cloud Server**
-  - Simply open the SmartSilk desktop app.
-  - Enter your central shop server or cloud URL (e.g. `https://shop.example.com`).
-  - Click **"Test Connection"** and log in with your credentials. *(No local engine or Docker required).*
-
-> **Switch Anytime:** Inside the SmartSilk app, navigate to **Settings $\rightarrow$ Server & Connection Mode** to seamlessly switch between **Local Engine** and a **Remote Server**.
+### 1. Download Options
+| Platform | Artifact Name | Contents |
+|:---|:---|:---|
+| **Windows** | `smartsilk-msi` | `SmartSilk-1.0.0.msi` (Setup Wizard) & `SmartSilk-Windows-Portable.zip` (Portable) |
+| **Linux** | `smartsilk-deb` | `smartsilk_1.0.0_amd64.deb` (Debian/Ubuntu native package) |
 
 ---
 
-## Setup
+### 2. Windows Installation & Uninstallation
 
-*(For developers contributing to or building the system from source)*
+#### Installation:
+- **Standard Installer (`.msi`):** Double-click `SmartSilk-1.0.0.msi` and follow the setup wizard. It installs into `Program Files` and creates a Desktop shortcut.
+- **Portable Zip (`.zip`):** Extract `SmartSilk-Windows-Portable.zip` to any folder and double-click `SmartSilk.exe`. No installation required!
+
+#### Uninstallation:
+1. Open Windows **Settings** $\rightarrow$ **Apps** $\rightarrow$ **Installed Apps** (or Control Panel $\rightarrow$ Programs and Features).
+2. Locate **SmartSilk** in the list.
+3. Click the menu (`...`) and select **Uninstall**.
+
+---
+
+### 3. Linux Installation & Uninstallation
+
+#### Installation:
+Download `smartsilk_1.0.0_amd64.deb` and install via terminal:
+```bash
+sudo dpkg -i smartsilk_1.0.0_amd64.deb
+# If any dependencies are needed:
+sudo apt-get install -f
+```
+The **SmartSilk** application icon will immediately appear in your desktop application launcher / Super Menu.
+
+#### Uninstallation:
+To cleanly remove the application from your Linux computer:
+```bash
+sudo apt remove smartsilk
+```
+To remove the application and purge any system configurations:
+```bash
+sudo apt purge smartsilk
+```
+To remove user cache and saved settings:
+```bash
+rm -rf ~/.config/smartsilk ~/.local/share/smartsilk
+```
+
+#### Why does Linux Settings display "Not sandboxed"?
+- Linux desktop environments (such as GNOME / Ubuntu Settings $\rightarrow$ Applications) classify containerized applications (like Flatpak or Snap) as "Sandboxed".
+- Native Debian packages (`.deb`)—such as Google Chrome, VS Code, Steam, and SmartSilk—install directly to native system paths (`/opt/smartsilk`) with direct access to native Wayland/X11 rendering, hardware acceleration, and system file dialogs.
+- "Not sandboxed" is standard for native Linux software and confirms that the app runs natively with zero container virtualization overhead.
+
+---
+
+## Setup (For Developers)
 
 Needs: JDK 21, Docker with the compose plugin (the tests start PostgreSQL in containers), Git. The Gradle wrapper
 downloads everything else.
@@ -103,9 +122,8 @@ From `Nexora-backend/` (Docker must be running):
 | Performance suite (slow, separate) | `./gradlew test -Pperformance` |
 | Dependency audit (needs `NVD_API_KEY`) | `./gradlew dependencyCheckAnalyze` |
 
-From `nexora-desktop/`: `./gradlew check` (lint, type checks and tests).
-
-From `smartledger-android/`: `./gradlew test` (unit and viewmodel tests).
+From `nexora-desktop/`: `./gradlew check` (lint, type checks and tests). Each requirement in
+`docs/02-REQUIREMENTS.md` is proven by a test whose name contains its ID (`docs/08-TESTING.md`).
 
 ## Deploy
 
@@ -120,4 +138,6 @@ Production runs on one Linux server with Docker: the server image, PostgreSQL an
 3. Desktop installers: `./gradlew packageDistributionForCurrentOS` in `nexora-desktop/` (MSI on Windows, DEB on
    Linux).
 
-The go-live data import is in [`deploy/import/README.md`](deploy/import/README.md).
+The first server setup, rollback, restore, secret rotation, user accounts and alerts are step by step in
+[`docs/RUNBOOK.md`](docs/RUNBOOK.md); the go-live data import is in [`deploy/import/README.md`](deploy/import/README.md);
+the reasons behind the deployment design are in [`docs/10-DEPLOYMENT.md`](docs/10-DEPLOYMENT.md).

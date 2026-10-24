@@ -72,9 +72,9 @@ compose.desktop {
             targetFormats(TargetFormat.Msi, TargetFormat.Deb)
             packageName = "SmartSilk"
             packageVersion = project.version.toString()
-            description = "SmartSilk business ledger for silk trading and warping"
+            description = "SmartSilk Business Ledger - Silk yarn trading, inventory, orders, and accounting"
             vendor = "SmartSilk"
-            copyright = "SmartSilk"
+            copyright = "Copyright 2026 SmartSilk"
             // jpackage bundles a trimmed Java 21 runtime: only these JDK modules besides the defaults
             // (from ./gradlew suggestRuntimeModules, plus jdk.crypto.ec for HTTPS with elliptic-curve keys).
             modules("java.instrument", "java.management", "jdk.security.auth", "jdk.unsupported", "jdk.crypto.ec")
@@ -92,8 +92,8 @@ compose.desktop {
                 iconFile.set(project.file("packaging/icon.png"))
                 shortcut = true
                 menuGroup = "Office"
-                debMaintainer = "smartsilk@localhost"
-                appCategory = "Office"
+                debMaintainer = "SmartSilk Support <support@smartsilk.com>"
+                appCategory = "Office;Finance;Accounting;"
             }
         }
     }

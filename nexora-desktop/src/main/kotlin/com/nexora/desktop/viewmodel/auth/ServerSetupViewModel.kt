@@ -7,7 +7,6 @@ import com.nexora.desktop.repository.ApiResult
 import com.nexora.desktop.ui.components.ErrorMessages
 import com.nexora.desktop.util.SettingsStore
 import com.nexora.desktop.util.s
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,15 +14,17 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import java.net.URI
-import java.nio.file.Files
-import java.nio.file.Path
+
+enum class ServerMode { LOCAL, REMOTE }
 
 data class ServerSetupState(
+    val mode: ServerMode = ServerMode.LOCAL,
     val address: String = "",
     val addressError: String? = null,
     val testing: Boolean = false,
-    /** Banner shown for a `http://localhost` development server. */
+    /** Banner shown for a `http://localhost` local or development server. */
     val developmentWarning: Boolean = false,
     val serverVersion: String? = null,
     val error: String? = null,
@@ -36,52 +37,47 @@ data class ServerSetupState(
  */
 class ServerSetupViewModel(private val api: ApiClient, private val settings: SettingsStore) : ViewModel() {
 
-    private val _state = MutableStateFlow(ServerSetupState(address = settings.current.serverUrl.orEmpty()))
+    private val _state = MutableStateFlow(
+        run {
+            val configured = settings.current.serverUrl.orEmpty()
+            val mode = if (configured.isEmpty() || configured.contains(":8088")) ServerMode.LOCAL else ServerMode.REMOTE
+            val address = if (configured.isEmpty()) DEFAULT_LOCAL_URL else configured
+            ServerSetupState(mode = mode, address = address)
+        }
+    )
     val state: StateFlow<ServerSetupState> = _state.asStateFlow()
+
+    fun selectMode(mode: ServerMode) {
+        if (mode == ServerMode.LOCAL) {
+            _state.update {
+                it.copy(
+                    mode = ServerMode.LOCAL,
+                    address = DEFAULT_LOCAL_URL,
+                    addressError = null,
+                    error = null,
+                    canContinue = false,
+                    serverVersion = null,
+                )
+            }
+        } else {
+            _state.update {
+                it.copy(
+                    mode = ServerMode.REMOTE,
+                    address = if (it.address == DEFAULT_LOCAL_URL) "" else it.address,
+                    addressError = null,
+                    error = null,
+                    canContinue = false,
+                    serverVersion = null,
+                )
+            }
+        }
+    }
 
     fun onAddressChange(text: String) {
         // Any edit invalidates a previous successful test.
         _state.update { it.copy(address = text, addressError = null, error = null, canContinue = false, serverVersion = null) }
     }
 
-    fun selectLocalMode() {
-        onAddressChange("http://localhost:8080")
-        testConnection()
-    }
-
-    fun tryStartAndConnectLocal() {
-        viewModelScope.launch {
-            try {
-                val os = System.getProperty("os.name").lowercase()
-                val isWindows = os.contains("win")
-                val candidates = if (isWindows) {
-                    listOf(
-                        Path.of("Local-Engine", "start.bat"),
-                        Path.of("..", "Local-Engine", "start.bat"),
-                        Path.of("start.bat")
-                    )
-                } else {
-                    listOf(
-                        Path.of("Local-Engine", "start.sh"),
-                        Path.of("..", "Local-Engine", "start.sh"),
-                        Path.of("start.sh")
-                    )
-                }
-                val script = candidates.firstOrNull { Files.exists(it) }
-                if (script != null) {
-                    if (isWindows) {
-                        ProcessBuilder("cmd", "/c", "start", script.toAbsolutePath().toString()).start()
-                    } else {
-                        ProcessBuilder("bash", script.toAbsolutePath().toString()).start()
-                    }
-                    delay(2500)
-                }
-            } catch (_: Exception) {
-                // Best-effort invocation
-            }
-            selectLocalMode()
-        }
-    }
 
     fun testConnection() {
         val address = _state.value.address.trim().trimEnd('/')
@@ -94,15 +90,7 @@ class ServerSetupViewModel(private val api: ApiClient, private val settings: Set
         viewModelScope.launch {
             val health = api.getFrom<JsonObject>(address, "/actuator/health")
             if (health is ApiResult.Failure) {
-                val message = if (health.error.isNetwork) {
-                    if (address.contains("localhost") || address.contains("127.0.0.1")) {
-                        "Local engine is not reachable. Double-click start.bat in the Local-Engine folder first."
-                    } else {
-                        s("setup.notReachable")
-                    }
-                } else {
-                    ErrorMessages.message(health.error)
-                }
+                val message = if (health.error.isNetwork) s("setup.notReachable") else ErrorMessages.message(health.error)
                 _state.update { it.copy(testing = false, error = message) }
                 return@launch
             }
@@ -134,6 +122,8 @@ class ServerSetupViewModel(private val api: ApiClient, private val settings: Set
     }
 
     companion object {
+        const val DEFAULT_LOCAL_URL = "http://localhost:8088"
+
         /**
          * Tokens must never cross a network unencrypted, so only `https://` is accepted; plain `http://` is allowed
          * for a server on this same computer during development (NFR-SEC-01, 06 section 11 #11).

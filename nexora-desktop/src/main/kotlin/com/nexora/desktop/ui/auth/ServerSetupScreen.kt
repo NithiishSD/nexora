@@ -1,6 +1,7 @@
 package com.nexora.desktop.ui.auth
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,10 +14,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -24,67 +25,102 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.nexora.desktop.util.s
+import com.nexora.desktop.viewmodel.auth.ServerMode
 import com.nexora.desktop.viewmodel.auth.ServerSetupViewModel
+import com.nexora.desktop.util.s
 
-/** S-AUTH-01 Server setup screen supporting both Local Standalone and Remote/Cloud server options. */
+/** S-AUTH-01 Server setup with isolated local engine & remote options. */
 @Composable
 fun ServerSetupScreen(viewModel: ServerSetupViewModel, onContinue: () -> Unit) {
     val state by viewModel.state.collectAsState()
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            Modifier.width(560.dp).padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+        Card(
+            modifier = Modifier.width(560.dp).padding(24.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         ) {
-            Text("SmartSilk Connection Setup", style = MaterialTheme.typography.headlineSmall)
-            Text(
-                "Choose how you want to connect to SmartSilk:",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Column(Modifier.fillMaxWidth().padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(s("setup.title"), style = MaterialTheme.typography.headlineSmall)
+                Text(s("setup.help"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-            // OPTION 1: LOCAL STANDALONE ENGINE
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Option 1: Run on this Computer (Local Engine)", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Run SmartSilk 100% locally and privately on this PC without needing an external cloud server.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = 4.dp)
+                // Mode Selection Cards
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Option 1: Local Engine
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { viewModel.selectMode(ServerMode.LOCAL) },
+                        border = BorderStroke(
+                            1.5.dp,
+                            if (state.mode == ServerMode.LOCAL) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                        ),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (state.mode == ServerMode.LOCAL)
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+                            else MaterialTheme.colorScheme.surface
+                        ),
                     ) {
-                        Button(onClick = viewModel::tryStartAndConnectLocal, enabled = !state.testing) {
-                            Text("Use Local Engine (localhost)")
+                        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = state.mode == ServerMode.LOCAL,
+                                onClick = { viewModel.selectMode(ServerMode.LOCAL) }
+                            )
+                            Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                                Text(s("setup.modeLocal"), style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    s("setup.modeLocalDesc"),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    ServerSetupViewModel.DEFAULT_LOCAL_URL,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+
+                    // Option 2: Remote / Cloud Server
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { viewModel.selectMode(ServerMode.REMOTE) },
+                        border = BorderStroke(
+                            1.5.dp,
+                            if (state.mode == ServerMode.REMOTE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                        ),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (state.mode == ServerMode.REMOTE)
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+                            else MaterialTheme.colorScheme.surface
+                        ),
+                    ) {
+                        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = state.mode == ServerMode.REMOTE,
+                                onClick = { viewModel.selectMode(ServerMode.REMOTE) }
+                            )
+                            Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                                Text(s("setup.modeRemote"), style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    s("setup.modeRemoteDesc"),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-                HorizontalDivider(modifier = Modifier.weight(1f))
-                Text(" OR ", modifier = Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.labelSmall)
-                HorizontalDivider(modifier = Modifier.weight(1f))
-            }
-
-            // OPTION 2: CONNECT TO REMOTE / CLOUD SERVER
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Option 2: Connect to Network or Cloud Server", style = MaterialTheme.typography.titleMedium)
+                // If Local Engine, show helpful reminder
+                if (state.mode == ServerMode.LOCAL) {
                     Text(
-                        "Connect to your central shop computer, local network server, or cloud instance.",
-                        style = MaterialTheme.typography.bodySmall
+                        s("setup.localEngineHint"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
                     )
+                } else {
                     OutlinedTextField(
                         value = state.address,
                         onValueChange = viewModel::onAddressChange,
@@ -93,39 +129,32 @@ fun ServerSetupScreen(viewModel: ServerSetupViewModel, onContinue: () -> Unit) {
                         isError = state.addressError != null,
                         supportingText = state.addressError?.let { { Text(it) } },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
+                }
+
+                if (state.developmentWarning) {
+                    Text(s("setup.developmentServer"), color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.bodySmall)
+                }
+                state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
+                state.serverVersion?.let {
+                    Text(s("setup.serverVersion", it), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedButton(onClick = viewModel::testConnection, enabled = !state.testing) {
                         Text(s("setup.test"))
                     }
+                    Button(
+                        onClick = { if (viewModel.saveAndContinue()) onContinue() },
+                        enabled = state.canContinue && !state.testing
+                    ) {
+                        Text(s("common.continue"))
+                    }
+                    if (state.testing) CircularProgressIndicator(modifier = Modifier.padding(start = 8.dp))
                 }
-            }
-
-            // Status and Results
-            if (state.developmentWarning) {
-                Text(s("setup.developmentServer"), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-            }
-            state.error?.let {
-                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
-            }
-            state.serverVersion?.let {
-                Text(s("setup.serverVersion", it), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
-            }
-
-            // Action Buttons
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(top = 6.dp)
-            ) {
-                Button(
-                    onClick = { if (viewModel.saveAndContinue()) onContinue() },
-                    enabled = state.canContinue
-                ) {
-                    Text("Continue to Login")
-                }
-                if (state.testing) CircularProgressIndicator()
             }
         }
     }
 }
+

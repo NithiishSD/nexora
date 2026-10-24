@@ -202,24 +202,21 @@ fun SettingsScreen(nav: NavigationViewModel) {
             }
         }
 
-        val isLocal = settings.serverUrl == "http://localhost:8080" || settings.serverUrl == "http://127.0.0.1:8080"
-        Section("Server & Connection Mode") {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    if (isLocal) "Active Mode: Local Engine (100% Offline Standalone)"
-                    else "Active Mode: Remote / Cloud Server (" + settings.serverUrl.orEmpty() + ")",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (!isLocal) {
-                        Button(onClick = vm::switchToLocalServer) {
-                            Text("Switch to Local Engine")
-                        }
-                    }
-                    OutlinedButton(onClick = actions.changeServer) {
-                        Text(s("settings.changeServer"))
+        Section(s("settings.server")) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                val url = settings.serverUrl.orEmpty()
+                val isLocal = url.contains(":8088")
+                Column(Modifier.weight(1f)) {
+                    Text(if (isLocal) "Local Engine ($url)" else url, style = MaterialTheme.typography.bodyMedium)
+                    if (isLocal) {
+                        Text(
+                            "Isolated Local Engine (Port 8088)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
+                OutlinedButton(onClick = actions.changeServer) { Text(s("settings.changeServer")) }
             }
         }
         Section(s("settings.display")) {

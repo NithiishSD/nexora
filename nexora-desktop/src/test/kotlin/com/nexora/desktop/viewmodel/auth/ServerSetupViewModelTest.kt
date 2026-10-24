@@ -21,6 +21,8 @@ class ServerSetupViewModelTest {
     @DisplayName("NFR-SEC-01 http address only allowed for localhost")
     fun httpAddress_onlyAllowedForLocalhost() {
         assertNull(ServerSetupViewModel.addressProblem("https://nexora.example.com"))
+        assertNull(ServerSetupViewModel.addressProblem("http://localhost:8088"))
+        assertNull(ServerSetupViewModel.addressProblem("http://127.0.0.1:8088"))
         assertNull(ServerSetupViewModel.addressProblem("http://localhost:8080"))
         assertNull(ServerSetupViewModel.addressProblem("http://127.0.0.1:8080"))
         assertNotNull(ServerSetupViewModel.addressProblem("http://nexora.example.com"))
@@ -28,6 +30,23 @@ class ServerSetupViewModelTest {
         assertNotNull(ServerSetupViewModel.addressProblem("nexora.example.com"))
         assertNotNull(ServerSetupViewModel.addressProblem("ftp://nexora.example.com"))
     }
+
+    @Test
+    @DisplayName("default state initializes to local engine mode at port 8088")
+    fun defaultState_initializesToLocalEngineMode() = vmTest { server ->
+        val vm = ServerSetupViewModel(server.client(), SettingsStore(dir.resolve("settings.json")))
+        assertEquals(ServerMode.LOCAL, vm.state.value.mode)
+        assertEquals(ServerSetupViewModel.DEFAULT_LOCAL_URL, vm.state.value.address)
+
+        vm.selectMode(ServerMode.REMOTE)
+        assertEquals(ServerMode.REMOTE, vm.state.value.mode)
+        assertEquals("", vm.state.value.address)
+
+        vm.selectMode(ServerMode.LOCAL)
+        assertEquals(ServerMode.LOCAL, vm.state.value.mode)
+        assertEquals(ServerSetupViewModel.DEFAULT_LOCAL_URL, vm.state.value.address)
+    }
+
 
     @Test
     @DisplayName("NFR-SEC-01 http address is rejected before any request is sent")
